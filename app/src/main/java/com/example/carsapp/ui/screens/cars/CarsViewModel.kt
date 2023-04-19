@@ -8,6 +8,7 @@ import com.example.carsapp.domain.model.Car
 import com.example.carsapp.domain.repository.SharedPreferencesRepository
 import com.example.carsapp.domain.usecase.AddCarUseCase
 import com.example.carsapp.domain.usecase.GetCarsUseCase
+import com.example.carsapp.domain.usecase.UpdateCarUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -17,6 +18,7 @@ import javax.inject.Inject
 class CarsViewModel @Inject constructor(
     private val getCarsUseCase: GetCarsUseCase,
     private val addCarUseCase: AddCarUseCase,
+    private val updateCarUseCase: UpdateCarUseCase,
     private val sharedPreferencesRepository: SharedPreferencesRepository,
 ) : ViewModel() {
     private val carsState = MutableStateFlow<SnapshotStateList<Car>>(mutableStateListOf())
@@ -27,6 +29,7 @@ class CarsViewModel @Inject constructor(
     fun addCar(car: Car) {
         carsState.value.add(car)
         carsState.value.sortBy { it.make }
+        filter(filterState.value)
         viewModelScope.launch {
             addCarUseCase.addCar(car)
         }
@@ -59,6 +62,12 @@ class CarsViewModel @Inject constructor(
             val list2 = SnapshotStateList<Car>()
             list2.addAll(list)
             filteredCarsState.emit(list2)
+        }
+    }
+
+    fun updateCar(car: Car) {
+        viewModelScope.launch {
+            updateCarUseCase.updateCar(car)
         }
     }
 

@@ -7,4 +7,6 @@ interface CarsRepository {
     suspend fun getCars(): Flow<List<Car>>
 
     suspend fun addCar(car: Car)
+
+    suspend fun updateCar(car: Car)
 }

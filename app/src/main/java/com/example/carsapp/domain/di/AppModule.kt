@@ -9,6 +9,7 @@ import com.example.carsapp.domain.repository.CarsRepository
 import com.example.carsapp.domain.repository.SharedPreferencesRepository
 import com.example.carsapp.domain.usecase.AddCarUseCase
 import com.example.carsapp.domain.usecase.GetCarsUseCase
+import com.example.carsapp.domain.usecase.UpdateCarUseCase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -47,6 +48,13 @@ object AppModule {
         carsRepository: CarsRepository
     ): AddCarUseCase =
         AddCarUseCase(carsRepository)
+
+    @Provides
+    @Singleton
+    fun provideUpdateCarUseCase(
+        carsRepository: CarsRepository
+    ): UpdateCarUseCase =
+        UpdateCarUseCase(carsRepository)
 
     @Provides
     @Singleton

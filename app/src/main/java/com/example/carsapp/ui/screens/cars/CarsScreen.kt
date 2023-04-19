@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,8 +13,10 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -394,7 +397,8 @@ fun AddCarDialog(
                         onClick = {
                             viewModel.addCar(
                                 Car(
-                                    if (yearState.value.text.isDigitsOnly()) yearState.value.text.toInt() else 0,
+                                    0,
+                                    if (yearState.value.text.isNotEmpty() && yearState.value.text.isDigitsOnly()) yearState.value.text.toInt() else 0,
                                     makeState.value.text,
                                     modelState.value.text,
                                     ""
@@ -433,19 +437,24 @@ fun CarsContent(
     val carsState = viewModel.filteredCarsState.collectAsState().value
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        carsState.forEach {
+        carsState.forEach { car ->
             item {
-                CarItem(it, onClick)
+                CarItem(car, viewModel, onClick)
             }
         }
     }
 }
-
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun CarItem(
     car: Car,
+    viewModel: CarsViewModel,
     onClick: () -> Unit
 ) {
+    var openEditMakeDialog by remember { mutableStateOf(false) }
+    var openEditModelDialog by remember { mutableStateOf(false) }
+    var openEditYearDialog by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -479,9 +488,228 @@ fun CarItem(
                     .fillMaxHeight()
                     .weight(0.6F)
             ) {
-                Text(modifier = Modifier.padding(10.dp), text = car.make)
-                Text(modifier = Modifier.padding(10.dp), text = car.model)
-                Text(modifier = Modifier.padding(10.dp), text = car.year.toString())
+                val squareSize = 48.dp
+                val sizePx = with(LocalDensity.current) { squareSize.toPx() }
+                val anchors = mapOf(0f to 0, sizePx to 1)
+                val makeSwipeableState = rememberSwipeableState(0)
+                val makeAlphaState = remember { mutableStateOf(1) }
+                val modelSwipeableState = rememberSwipeableState(0)
+                val modelAlphaState = remember { mutableStateOf(1) }
+                val yearSwipeableState = rememberSwipeableState(0)
+                val yearAlphaState = remember { mutableStateOf(1) }
+                Row(
+                    modifier = Modifier
+                        .wrapContentSize()
+                        .swipeable(
+                            state = makeSwipeableState,
+                            anchors = anchors,
+                            thresholds = { _, _ -> FractionalThreshold(0.3f) },
+                            orientation = Orientation.Horizontal
+                        )
+                ) {
+                    Text(modifier = Modifier.padding(10.dp), text = car.make)
+                    Text(
+                        modifier = Modifier
+                            .padding(10.dp)
+                            .alpha(if (makeSwipeableState.currentValue.toFloat() > 0 && makeAlphaState.value > 0) 1F else 0F)
+                            .clickable {
+                                makeAlphaState.value = 0
+                                openEditMakeDialog = true
+                            },
+                        text = stringResource(id = R.string.edit),
+                        color = Color.Blue
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .wrapContentSize()
+                        .swipeable(
+                            state = modelSwipeableState,
+                            anchors = anchors,
+                            thresholds = { _, _ -> FractionalThreshold(0.3f) },
+                            orientation = Orientation.Horizontal
+                        )
+                ) {
+                    Text(modifier = Modifier.padding(10.dp), text = car.model)
+                    Text(
+                        modifier = Modifier
+                            .padding(10.dp)
+                            .alpha(if (modelSwipeableState.currentValue.toFloat() > 0 && modelAlphaState.value > 0) 1F else 0F)
+                            .clickable {
+                                modelAlphaState.value = 0
+                                openEditModelDialog = true
+                            },
+                        text = stringResource(id = R.string.edit),
+                        color = Color.Blue
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .wrapContentSize()
+                        .swipeable(
+                            state = yearSwipeableState,
+                            anchors = anchors,
+                            thresholds = { _, _ -> FractionalThreshold(0.3f) },
+                            orientation = Orientation.Horizontal
+                        )
+                ) {
+                    Text(modifier = Modifier.padding(10.dp), text = car.year.toString())
+                    Text(
+                        modifier = Modifier
+                            .padding(10.dp)
+                            .alpha(if (yearSwipeableState.currentValue.toFloat() > 0 && yearAlphaState.value > 0) 1F else 0F)
+                            .clickable {
+                                yearAlphaState.value = 0
+                                openEditYearDialog = true
+                            },
+                        text = stringResource(id = R.string.edit),
+                        color = Color.Blue
+                    )
+                }
+            }
+        }
+    }
+    if (openEditMakeDialog) {
+        EditDialog(openEditMakeDialog, viewModel, car, "make") {
+            openEditMakeDialog = false
+        }
+    }
+    if (openEditModelDialog) {
+        EditDialog(openEditModelDialog, viewModel, car, "model") {
+            openEditModelDialog = false
+        }
+    }
+    if (openEditYearDialog) {
+        EditDialog(openEditYearDialog, viewModel, car, "year") {
+            openEditYearDialog = false
+        }
+    }
+}
+
+@Composable
+fun EditDialog(
+    openDialogArg: Boolean,
+    viewModel: CarsViewModel,
+    car: Car,
+    propertyName: String,
+    closeAction: () -> Unit
+) {
+    var openDialog by remember { mutableStateOf(openDialogArg) }
+    var propertyState = remember { mutableStateOf(TextFieldValue()) }
+
+    Dialog(
+        onDismissRequest = {
+            openDialog = false
+            closeAction()
+        },
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+        ),
+    ) {
+        Card(
+            shape = RoundedCornerShape(8.dp),
+            backgroundColor = Color.White
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp),
+            ) {
+                TextField(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    value = propertyState.value,
+                    onValueChange = {
+                        propertyState.value = it
+                    },
+                    placeholder = {
+                        Text(
+                            text = when(propertyName) {
+                                "make" -> stringResource(id = R.string.make)
+                                "model" -> stringResource(id = R.string.model)
+                                "year" -> stringResource(id = R.string.year)
+                                else -> ""
+                            },
+                            fontSize = 14.sp
+                        )
+                    },
+                    textStyle = TextStyle(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Normal
+                    ),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Done,
+                    ),
+                    colors = TextFieldDefaults.textFieldColors(
+                        backgroundColor = Color.White,
+                        cursorColor = Color.LightGray,
+                        focusedIndicatorColor = Color.LightGray,
+                        unfocusedIndicatorColor = Color.LightGray,
+                    ),
+                    singleLine = true,
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 24.dp),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    Button(
+                        modifier = Modifier
+                            .wrapContentSize(),
+                        onClick = {
+                            openDialog = false
+                            closeAction()
+                        },
+                        elevation = ButtonDefaults.elevation(0.dp, 0.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            backgroundColor = Color.White,
+                        ),
+                        enabled = true,
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Row {
+                            Text(
+                                text = stringResource(id = R.string.cancel),
+                                fontSize = 16.sp,
+                                letterSpacing = 0.sp,
+                                fontWeight = FontWeight.Normal,
+                            )
+                        }
+                    }
+                    Button(
+                        modifier = Modifier
+                            .wrapContentSize()
+                            .padding(start = 32.dp),
+                        onClick = {
+                            when(propertyName) {
+                                "make" -> car.make = propertyState.value.text
+                                "model" -> car.model = propertyState.value.text
+                                "year" -> car.year = propertyState.value.text.toInt()
+                            }
+                            viewModel.updateCar(car)
+                            openDialog = false
+                            closeAction()
+                        },
+                        elevation = ButtonDefaults.elevation(0.dp, 0.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            backgroundColor = Color.White,
+                        ),
+                        enabled = true,
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Row {
+                            Text(
+                                text = stringResource(id = R.string.save),
+                                fontSize = 16.sp,
+                                letterSpacing = 0.sp,
+                                fontWeight = FontWeight.Normal,
+                            )
+                        }
+                    }
+                }
             }
         }
     }
